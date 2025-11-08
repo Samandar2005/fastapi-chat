@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>FastAPI Chat 💬</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <h2>⚡ Real-time Chat</h2>
+    <input id="username" placeholder="Ismingizni kiriting" />
+    <button onclick="joinChat()">Chatga kirish</button>
+
+    <div id="chat-box" class="hidden">
+      <div id="messages"></div>
+      <input id="message" placeholder="Xabar yozing..." />
+      <button onclick="sendMessage()">📨 Yuborish</button>
+    </div>
+
+    <script src="/static/script.js"></script>
+  </body>
+</html>
