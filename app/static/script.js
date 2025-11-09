@@ -103,7 +103,6 @@ function showError(message) {
     }, 3000);
 }
 
-// Sahifa yuklanishida username inputiga fokus
 window.onload = () => {
     document.getElementById('username').focus();
 };
