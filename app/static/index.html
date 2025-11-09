@@ -12,13 +12,12 @@
         <div class="login-container" id="login-container">
             <h1>📱 FastAPI Chat</h1>
             <div class="login-box">
-                <input type="text" id="username" placeholder="Ismingizni kiriting" />
-                <button onclick="joinChat()" class="join-btn">
-                    <span>Chatga kirish</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-                        <path fill="currentColor" d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/>
-                    </svg>
-                </button>
+                <input type="text" id="username" placeholder="Ismingizni kiriting" autocomplete="username" />
+                <input type="password" id="password" placeholder="Parolni kiriting" autocomplete="current-password" />
+                <div class="auth-actions">
+                    <button onclick="registerUser()" class="auth-btn register">Ro'yxatdan o'tish</button>
+                    <button onclick="loginUser()" class="auth-btn login">Kirish</button>
+                </div>
             </div>
         </div>
 

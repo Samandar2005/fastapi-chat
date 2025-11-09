@@ -8,21 +8,83 @@ document.getElementById('message').addEventListener('keypress', function(e) {
     }
 });
 
-// Username input uchun Enter tugmasi
+// Sahifadagi inputlar uchun Enter tugmasi (username/password)
 document.getElementById('username').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
-        joinChat();
+        loginUser();
+    }
+});
+document.getElementById('password').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        loginUser();
     }
 });
 
-function joinChat() {
-    const loginContainer = document.getElementById('login-container');
+async function registerUser() {
     const username = document.getElementById('username').value.trim();
-    if (!username) {
+    const password = document.getElementById('password').value.trim();
+    if (!username || !password) {
         shakeElement(document.getElementById('username'));
         return;
     }
+    
+    // Check password length before sending to server
+    if (new TextEncoder().encode(password).length > 72) {
+        showError('Parol juda uzun - 72 baytdan kam bo\'lishi kerak');
+        return;
+    }
 
+    try {
+        const res = await fetch('/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Ro\'yxatdan o\'tishda xatolik');
+        }
+        showError('Ro\'yxatdan muvaffaqiyatli o\'tdingiz. Endi kirishingiz mumkin.', 'success');
+    } catch (e) {
+        showError(e.message || 'Xatolik');
+    }
+}
+
+async function loginUser() {
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value.trim();
+    if (!username || !password) {
+        shakeElement(document.getElementById('username'));
+        return;
+    }
+    
+    // Check password length before sending to server
+    if (new TextEncoder().encode(password).length > 72) {
+        showError('Parol juda uzun - 72 baytdan kam bo\'lishi kerak');
+        return;
+    }
+
+    try {
+        const res = await fetch('/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Kirishda xatolik');
+        }
+        const data = await res.json();
+        // Saqlash (keyinchalik kerak bo'lsa)
+        localStorage.setItem('access_token', data.access_token);
+        connectWebSocket(username);
+    } catch (e) {
+        showError(e.message || 'Xatolik');
+    }
+}
+
+function connectWebSocket(username) {
+    const loginContainer = document.getElementById('login-container');
     ws = new WebSocket(`ws://localhost:8000/ws/${username}`);
 
     ws.onopen = () => {

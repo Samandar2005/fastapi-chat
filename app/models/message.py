@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime
 from datetime import datetime
-from app.database import Base
+# Use Base from app.core.database (project uses core/database.py)
+from app.core.database import Base
 
 class User(Base):
     __tablename__ = "users"
@@ -17,4 +18,4 @@ class Message(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, index=True)
     content = Column(String)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)

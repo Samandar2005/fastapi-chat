@@ -14,6 +14,9 @@ sync_url = DATABASE_URL.replace("+aiosqlite", "")
 
 engine = create_engine(sync_url, echo=False, future=True)
 
+# Import models so they are registered on Base.metadata
+import app.models  # noqa: F401
+
 def init_db():
     Base.metadata.create_all(bind=engine)
     print("Database initialized (chat.db)")
