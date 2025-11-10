@@ -28,3 +28,7 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 @app.get("/")
 async def root():
     return FileResponse("app/static/index.html")
+
+@app.get("/.well-known/appspecific/com.chrome.devtools.json")
+async def ignore_chrome_devtools():
+    return {"status": "ok"}  # Chrome DevTools so'rovini ignore qilish

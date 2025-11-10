@@ -16,8 +16,8 @@
                 <input type="text" id="username" placeholder="Ismingizni kiriting" autocomplete="username" />
                 <input type="password" id="password" placeholder="Parolni kiriting" autocomplete="current-password" />
                 <div class="auth-actions">
-                    <button onclick="registerUser()" class="auth-btn register">Ro'yxatdan o'tish</button>
-                    <button onclick="loginUser()" class="auth-btn login">Kirish</button>
+                    <button type="button" id="registerBtn" class="auth-btn register">Ro'yxatdan o'tish</button>
+                    <button type="button" id="loginBtn" class="auth-btn login">Kirish</button>
                 </div>
             </div>
         </div>
@@ -28,6 +28,7 @@
                 <div class="online-container">
                     <span id="online-status">🟢 Online</span>
                     <div id="online-users" class="online-users"></div>
+                    <div id="typing-indicator" class="typing-indicator"></div>
                 </div>
             </div>
             
