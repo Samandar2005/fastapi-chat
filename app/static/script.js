@@ -97,6 +97,13 @@ function connectWebSocket(username) {
     };
 
     ws.onmessage = (event) => {
+        // Online foydalanuvchilar ro'yxatini yangilash
+        if (event.data.startsWith('ONLINE_USERS:')) {
+            const onlineUsers = event.data.substring(12).split(',');
+            updateOnlineUsers(onlineUsers);
+            return;
+        }
+        
         const msgDiv = document.getElementById('messages');
         const newMessage = document.createElement('p');
         newMessage.textContent = event.data;
@@ -163,6 +170,19 @@ function showError(message) {
             error.remove();
         }, 500);
     }, 3000);
+}
+
+function updateOnlineUsers(users) {
+    const onlineUsersDiv = document.getElementById('online-users');
+    onlineUsersDiv.innerHTML = '';
+    users.forEach(user => {
+        const userSpan = document.createElement('span');
+        userSpan.className = 'online-user';
+        userSpan.textContent = user;
+        onlineUsersDiv.appendChild(userSpan);
+    });
+    document.getElementById('online-status').innerHTML = 
+        `🟢 Online (${users.length})`;
 }
 
 window.onload = () => {

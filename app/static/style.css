@@ -124,11 +124,35 @@ button {
     font-weight: 500;
 }
 
+.online-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+}
+
 #online-status {
     font-size: 0.9rem;
     display: flex;
     align-items: center;
     gap: 5px;
+}
+
+.online-users {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 0.8rem;
+    max-width: 200px;
+}
+
+.online-user {
+    display: inline-block;
+    margin: 2px 4px;
+    padding: 2px 6px;
+    background: rgba(46, 213, 115, 0.2);
+    border-radius: 10px;
+    color: #fff;
 }
 
 .messages-container {

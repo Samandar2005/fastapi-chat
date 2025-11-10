@@ -13,11 +13,13 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)):
     """Register a new user. Expects JSON: {"username": "...", "password": "..."}"""
     try:
+        # Check if username already exists
         result = await db.execute(select(User).where(User.username == payload.username))
         existing = result.scalar_one_or_none()
         if existing:
             raise HTTPException(status_code=400, detail="Username already taken")
             
+        # Create new user
         new_user = User(username=payload.username, hashed_password=hash_password(payload.password))
         db.add(new_user)
         await db.commit()
@@ -26,13 +28,7 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-    new_user = User(username=payload.username, hashed_password=hash_password(payload.password))
-    db.add(new_user)
-    await db.commit()
-    await db.refresh(new_user)
-    return {"message": "User registered successfully"}
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @router.post("/login", response_model=Token)
