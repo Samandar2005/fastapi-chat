@@ -2,9 +2,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+import os
 from app.routers import chat, auth
 from app.core.database import Base, engine
 from app.core.state import manager
+
+# Load environment variables at startup
+load_dotenv()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -19,6 +25,16 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="FastAPI Real-Time Chat",
     lifespan=lifespan
+)
+
+# CORS configuration
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(chat.router)

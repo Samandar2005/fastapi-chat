@@ -1,5 +1,6 @@
 from fastapi import WebSocket
-from typing import List
+from typing import List, Dict
+import json
 
 from contextlib import asynccontextmanager
 
@@ -7,6 +8,7 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
         self.usernames: dict[WebSocket, str] = {}
+        self.typing_users: Dict[str, bool] = {}  # Track typing status
         self._shutdown = False
     
     @asynccontextmanager
@@ -67,3 +69,26 @@ class ConnectionManager:
                 self.active_connections.remove(conn)
             if conn in self.usernames:
                 del self.usernames[conn]
+
+    async def broadcast_json(self, data: dict):
+        """Broadcast JSON data to all connected clients."""
+        message = json.dumps(data, ensure_ascii=False)
+        await self.broadcast(message)
+
+    async def user_typing(self, username: str, is_typing: bool):
+        """Update and broadcast typing status for a user."""
+        if is_typing:
+            self.typing_users[username] = True
+        else:
+            self.typing_users.pop(username, None)
+        
+        # Broadcast typing status to all clients
+        typing_list = list(self.typing_users.keys())
+        await self.broadcast_json({
+            "type": "typing",
+            "users": typing_list
+        })
+
+    def get_online_users(self) -> List[str]:
+        """Get list of currently online usernames."""
+        return list(self.usernames.values())

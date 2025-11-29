@@ -42,10 +42,9 @@ async def login(payload: UserCreate, db: AsyncSession = Depends(get_db)):
 
         token = create_access_token({"sub": user.username})
         return {"access_token": token, "token_type": "bearer"}
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail="Internal server error")
-
-    token = create_access_token({"sub": user.username})
-    return {"access_token": token, "token_type": "bearer"}
