@@ -1,6 +1,8 @@
 // Global variables
 let ws = null;
 let typingTimer = null;
+let typingDebounceTimer = null;
+let isTyping = false;
 const messageSound = new Audio("data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAEAAABVgANTU1NTU1Q0NDQ0NDUFBQUFBQXl5eXl5ea2tra2tra3l5eXl5eYaGhoaGhpSUlJSUlKGhoaGhoaGvr6+vr6+8vLy8vLzKysrKysrY2NjY2Njm5ubm5ub09PT09PT///////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAABVjMmLsL/+RYxAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV/+MYxDsAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV/+MYxHYAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV/+MYxLEAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV");
 
 // Utility functions
@@ -211,12 +213,19 @@ function connectWebSocket(username) {
                     break;
 
                 case "typing":
-                    if (data.username !== username) {
-                        typingIndicator.textContent = `${data.username} yozmoqda...`;
-                        clearTimeout(typingTimer);
-                        typingTimer = setTimeout(() => {
+                    // Only show typing indicator for other users, not for current user
+                    if (data.username && data.username !== username) {
+                        if (data.is_typing) {
+                            typingIndicator.textContent = `${data.username} yozmoqda...`;
+                            clearTimeout(typingTimer);
+                            typingTimer = setTimeout(() => {
+                                typingIndicator.textContent = "";
+                            }, 3000); // Show for 3 seconds
+                        } else {
+                            // Clear typing indicator when user stops typing
                             typingIndicator.textContent = "";
-                        }, 1000);
+                            clearTimeout(typingTimer);
+                        }
                     }
                     break;
                     
@@ -243,9 +252,35 @@ function connectWebSocket(username) {
     // Message input handler
     messageInput.onkeyup = (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
+            // Stop typing indicator when sending message
+            if (isTyping) {
+                ws.send(JSON.stringify({ type: "typing", typing: false }));
+                isTyping = false;
+            }
+            if (typingDebounceTimer) {
+                clearTimeout(typingDebounceTimer);
+                typingDebounceTimer = null;
+            }
             sendMessage();
         } else {
-            ws.send(JSON.stringify({ type: "typing", typing: true }));
+            // Send typing status with debounce
+            if (!isTyping) {
+                ws.send(JSON.stringify({ type: "typing", typing: true }));
+                isTyping = true;
+            }
+            
+            // Clear existing debounce timer
+            if (typingDebounceTimer) {
+                clearTimeout(typingDebounceTimer);
+            }
+            
+            // Set new debounce timer - stop typing after 2 seconds of inactivity
+            typingDebounceTimer = setTimeout(() => {
+                if (isTyping) {
+                    ws.send(JSON.stringify({ type: "typing", typing: false }));
+                    isTyping = false;
+                }
+            }, 2000);
         }
     };
 }

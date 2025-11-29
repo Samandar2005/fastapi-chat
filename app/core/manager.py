@@ -82,12 +82,23 @@ class ConnectionManager:
         else:
             self.typing_users.pop(username, None)
         
-        # Broadcast typing status to all clients
+        # Broadcast typing status to all clients except the user who is typing
         typing_list = list(self.typing_users.keys())
-        await self.broadcast_json({
-            "type": "typing",
-            "users": typing_list
-        })
+        for connection in self.active_connections.copy():
+            try:
+                # Don't send typing status to the user who is typing
+                if self.usernames.get(connection) != username:
+                    await connection.send_json({
+                        "type": "typing",
+                        "username": username,
+                        "is_typing": is_typing
+                    })
+            except Exception:
+                # Mark for removal if sending fails
+                if connection in self.active_connections:
+                    self.active_connections.remove(connection)
+                if connection in self.usernames:
+                    del self.usernames[connection]
 
     def get_online_users(self) -> List[str]:
         """Get list of currently online usernames."""
