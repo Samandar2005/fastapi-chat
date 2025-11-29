@@ -18,4 +18,5 @@ class Message(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, index=True)
     content = Column(String)
+    image = Column(String, nullable=True)  # Base64 encoded image or URL
     created_at = Column(DateTime, default=datetime.utcnow)

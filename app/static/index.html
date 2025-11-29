@@ -37,12 +37,56 @@
             </div>
 
             <div class="input-container">
+                <button id="sticker-btn" class="sticker-btn" title="Stickerlar">
+                    🎨
+                </button>
+                <button id="emoji-btn" class="emoji-btn" title="Emoji">
+                    😀
+                </button>
                 <input type="text" id="message" placeholder="Xabar yozing..." />
+                <button id="file-btn" class="file-btn" title="Rasm yuklash">
+                    📎
+                </button>
+                <input type="file" id="file-input" accept="image/*" style="display: none;" />
                 <button onclick="sendMessage()" class="send-btn">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
                         <path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
                     </svg>
                 </button>
+                
+                <!-- Sticker Picker -->
+                <div id="sticker-picker" class="sticker-picker hidden">
+                    <div class="sticker-picker-header">
+                        <span>Stickerlar</span>
+                        <button id="close-sticker" class="close-sticker">×</button>
+                    </div>
+                    <div class="sticker-categories">
+                        <button class="sticker-category active" data-category="smileys">😀</button>
+                        <button class="sticker-category" data-category="love">❤️</button>
+                        <button class="sticker-category" data-category="celebration">🎉</button>
+                        <button class="sticker-category" data-category="animals">🐶</button>
+                        <button class="sticker-category" data-category="food">🍕</button>
+                        <button class="sticker-category" data-category="gestures">👋</button>
+                    </div>
+                    <div id="sticker-grid" class="sticker-grid"></div>
+                </div>
+                
+                <!-- Emoji Picker -->
+                <div id="emoji-picker" class="emoji-picker hidden">
+                    <div class="emoji-picker-header">
+                        <span>Emoji tanlang</span>
+                        <button id="close-emoji" class="close-emoji">×</button>
+                    </div>
+                    <div class="emoji-categories">
+                        <button class="emoji-category active" data-category="smileys">😀</button>
+                        <button class="emoji-category" data-category="gestures">👋</button>
+                        <button class="emoji-category" data-category="animals">🐶</button>
+                        <button class="emoji-category" data-category="food">🍕</button>
+                        <button class="emoji-category" data-category="travel">✈️</button>
+                        <button class="emoji-category" data-category="objects">💡</button>
+                    </div>
+                    <div id="emoji-grid" class="emoji-grid"></div>
+                </div>
             </div>
         </div>
     </div>

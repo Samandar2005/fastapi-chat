@@ -29,6 +29,46 @@ function shakeElement(element) {
     }, 500);
 }
 
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Open image in modal
+function openImageModal(imageSrc) {
+    const modal = document.createElement("div");
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        cursor: pointer;
+    `;
+    
+    const img = document.createElement("img");
+    img.src = imageSrc;
+    img.style.cssText = `
+        max-width: 90%;
+        max-height: 90%;
+        border-radius: 10px;
+    `;
+    
+    modal.appendChild(img);
+    document.body.appendChild(modal);
+    
+    modal.addEventListener("click", () => {
+        document.body.removeChild(modal);
+    });
+}
+
 // Auth functions
 async function registerUser() {
     console.log("Register function called");
@@ -133,6 +173,26 @@ function connectWebSocket(username) {
     chatContainer.classList.remove("hidden");
     loginContainer.classList.add("hidden");
 
+    // Initialize sticker and emoji pickers after chat is visible
+    setTimeout(() => {
+        console.log("Initializing pickers after chat opened...");
+        const testBtn = document.getElementById("sticker-btn");
+        const testPicker = document.getElementById("sticker-picker");
+        console.log("Test elements:", { testBtn, testPicker });
+        
+        if (testBtn && testPicker) {
+            initStickerPicker();
+            initEmojiPicker();
+            console.log("Pickers initialized successfully");
+        } else {
+            console.error("Elements not found, retrying...");
+            setTimeout(() => {
+                initStickerPicker();
+                initEmojiPicker();
+            }, 200);
+        }
+    }, 100);
+
     // Connect to WebSocket
     const token = localStorage.getItem("access_token");
     const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -191,13 +251,31 @@ function connectWebSocket(username) {
                     console.log("Message received:", data);
                     const messageDiv = document.createElement("div");
                     messageDiv.className = `message ${data.username === username ? "sent" : "received"}`;
-                    messageDiv.innerHTML = `
+                    
+                    let messageHTML = `
                         <div class="message-content">
                             <span class="username">${data.username}</span>
-                            <p>${data.message}</p>
+                    `;
+                    
+                    // Add image if present
+                    if (data.image) {
+                        messageHTML += `<img src="${data.image}" alt="Rasm" class="message-image" onclick="openImageModal('${data.image}')" />`;
+                    }
+                    
+                    // Add sticker if present (display larger)
+                    if (data.isSticker && data.message) {
+                        messageHTML += `<div class="message-sticker">${data.message}</div>`;
+                    } else if (data.message) {
+                        // Add regular message text
+                        messageHTML += `<p>${escapeHtml(data.message)}</p>`;
+                    }
+                    
+                    messageHTML += `
                             <span class="time">${new Date(data.timestamp).toLocaleTimeString()}</span>
                         </div>
                     `;
+                    
+                    messageDiv.innerHTML = messageHTML;
                     messagesContainer.appendChild(messageDiv);
                     messagesContainer.scrollTop = messagesContainer.scrollHeight;
                     if (data.username !== username) {
@@ -292,11 +370,293 @@ function sendMessage() {
     if (!message) return;
     
     if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "message", message }));
+        // Check if message is a single emoji (sticker)
+        // Emoji characters are typically in the range 0x1F300-0x1F9FF or other emoji ranges
+        const isSticker = message.length === 1 && (
+            /[\u{1F300}-\u{1F9FF}]/u.test(message) || 
+            /[\u{2600}-\u{26FF}]/u.test(message) ||
+            /[\u{2700}-\u{27BF}]/u.test(message) ||
+            /[\u{1F600}-\u{1F64F}]/u.test(message) ||
+            /[\u{1F680}-\u{1F6FF}]/u.test(message) ||
+            /[\u{1F1E0}-\u{1F1FF}]/u.test(message) ||
+            /[\u{1F900}-\u{1F9FF}]/u.test(message) ||
+            /[\u{1FA00}-\u{1FAFF}]/u.test(message)
+        );
+        
+        ws.send(JSON.stringify({ 
+            type: "message", 
+            message: message,
+            isSticker: isSticker
+        }));
         messageInput.value = "";
+        
+        // Stop typing indicator
+        if (isTyping) {
+            ws.send(JSON.stringify({ type: "typing", typing: false }));
+            isTyping = false;
+        }
+        if (typingDebounceTimer) {
+            clearTimeout(typingDebounceTimer);
+            typingDebounceTimer = null;
+        }
     } else {
         showError("Chat bilan aloqa yo'q");
     }
+}
+
+// Sticker data (Telegram-style large emoji stickers)
+const stickerCategories = {
+    smileys: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '😵', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐'],
+    love: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '☮️', '✝️', '☪️', '🕉', '☸️', '✡️', '🔯', '🕎', '☯️', '☦️', '🛐', '⛎', '♈️', '♉️', '♊️', '♋️', '♌️', '♍️', '♎️', '♏️', '♐️', '♑️', '♒️', '♓️', '🆔', '⚛️', '🉑', '☢️', '☣️'],
+    celebration: ['🎉', '🎊', '🎈', '🎁', '🎀', '🎂', '🍰', '🧁', '🍭', '🍬', '🍫', '🍿', '🍩', '🍪', '🥳', '🎆', '🎇', '✨', '🌟', '⭐', '💫', '🌠', '🎃', '🎄', '🎅', '🤶', '🎄', '🎁', '🎀', '🎊', '🎉', '🎈', '🎂', '🍰', '🧁', '🍭', '🍬', '🍫', '🍿', '🍩', '🍪', '🥳'],
+    animals: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐽', '🐸', '🐵', '🙈', '🙉', '🙊', '🐒', '🐔', '🐧', '🐦', '🐤', '🐣', '🐥', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗', '🐴', '🦄', '🐝', '🐛', '🦋', '🐌', '🐞', '🐜', '🦟', '🦗', '🕷', '🦂', '🐢', '🐍', '🦎', '🦖', '🦕', '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳', '🐋', '🦈', '🐊', '🐅', '🐆', '🦓', '🦍', '🦧', '🐘', '🦛', '🦏', '🐪', '🐫', '🦒', '🦘', '🦬', '🐃', '🐂', '🐄', '🐎', '🐖', '🐏', '🐑', '🦙', '🐐', '🦌', '🐕', '🐩', '🦮', '🐕‍🦺', '🐈', '🐈‍⬛'],
+    food: ['🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶', '🌽', '🥕', '🥔', '🍠', '🥐', '🥯', '🍞', '🥖', '🥨', '🧀', '🥚', '🍳', '🥞', '🥓', '🥩', '🍗', '🍖', '🦴', '🌭', '🍔', '🍟', '🍕', '🥪', '🥙', '🌮', '🌯', '🥗', '🥘', '🥫', '🍝', '🍜', '🍲', '🍛', '🍣', '🍱', '🥟', '🦪', '🍤', '🍙', '🍚', '🍘', '🍥', '🥠', '🥮', '🍢', '🍡', '🍧', '🍨', '🍦', '🥧', '🍰', '🎂', '🍮', '🍭', '🍬', '🍫', '🍿', '🍩', '🍪'],
+    gestures: ['👋', '🤚', '🖐', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '🦻', '👃']
+};
+
+// Emoji data
+const emojiCategories = {
+    smileys: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '😶‍🌫️', '😵', '😵‍💫', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐'],
+    gestures: ['👋', '🤚', '🖐', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '🦻', '👃', '👶', '👧', '🧒', '👦', '👩', '🧑', '👨', '👩‍🦱', '👨‍🦱', '👩‍🦰', '👨‍🦰', '👱', '👩‍🦳', '👨‍🦳', '👩‍🦲', '👨‍🦲', '🧔', '👵', '🧓', '👴', '👲', '👳', '👮', '👷', '💂', '🕵️', '👩‍⚕️', '👨‍⚕️', '👩‍🌾', '👨‍🌾', '👩‍🍳', '👨‍🍳', '👩‍🎓', '👨‍🎓', '👩‍🎤', '👨‍🎤', '👩‍🏫', '👨‍🏫', '👩‍🏭', '👨‍🏭', '👩‍💻', '👨‍💻', '👩‍💼', '👨‍💼', '👩‍🔧', '👨‍🔧', '👩‍🔬', '👨‍🔬', '👩‍🎨', '👨‍🎨', '👩‍🚒', '👨‍🚒', '👩‍✈️', '👨‍✈️', '👩‍🚀', '👨‍🚀', '👩‍⚖️', '👨‍⚖️', '🤶', '🎅', '👸', '🤴', '👰', '🤵', '👼', '🤰', '🤱', '👼', '🎅', '🤶', '🦸', '🦹', '🧙', '🧚', '🧛', '🧜', '🧝', '🧞', '🧟', '💆', '💇', '🚶', '🏃', '💃', '🕺', '🕴', '👯', '🧘', '🧗', '🤺', '🏇', '⛷', '🏂', '🏌', '🏄', '🚣', '🏊', '⛹', '🏋', '🚴', '🚵', '🤸', '🤼', '🤽', '🤾', '🤹', '🧗', '🧘', '🛀', '🛌', '👭', '👫', '👬', '💏', '💑', '👪', '👨‍👩‍👧', '👨‍👩‍👧‍👦', '👨‍👩‍👦‍👦', '👨‍👩‍👧‍👧', '👩‍👩‍👦', '👩‍👩‍👧', '👩‍👩‍👧‍👦', '👩‍👩‍👦‍👦', '👩‍👩‍👧‍👧', '👨‍👨‍👦', '👨‍👨‍👧', '👨‍👨‍👧‍👦', '👨‍👨‍👦‍👦', '👨‍👨‍👧‍👧', '👩‍👦', '👩‍👧', '👩‍👧‍👦', '👩‍👦‍👦', '👩‍👧‍👧', '👨‍👦', '👨‍👧', '👨‍👧‍👦', '👨‍👦‍👦', '👨‍👧‍👧', '🧶', '🧵', '🧥', '🥼', '🦺', '👚', '👕', '👖', '🩲', '🩳', '👔', '👗', '👙', '👘', '🥻', '🩱', '👠', '👡', '👢', '👞', '👟', '🥾', '🥿', '🧦', '🧤', '🧣', '🎩', '🧢', '👒', '🎓', '⛑', '🪖', '💄', '💍', '💼'],
+    animals: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐽', '🐸', '🐵', '🙈', '🙉', '🙊', '🐒', '🐔', '🐧', '🐦', '🐤', '🐣', '🐥', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗', '🐴', '🦄', '🐝', '🐛', '🦋', '🐌', '🐞', '🐜', '🦟', '🦗', '🕷', '🦂', '🐢', '🐍', '🦎', '🦖', '🦕', '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳', '🐋', '🦈', '🐊', '🐅', '🐆', '🦓', '🦍', '🦧', '🐘', '🦛', '🦏', '🐪', '🐫', '🦒', '🦘', '🦬', '🐃', '🐂', '🐄', '🐎', '🐖', '🐏', '🐑', '🦙', '🐐', '🦌', '🐕', '🐩', '🦮', '🐕‍🦺', '🐈', '🐈‍⬛', '🪶', '🐓', '🦃', '🦤', '🦚', '🦜', '🦢', '🦩', '🕊', '🐇', '🦝', '🦨', '🦡', '🦫', '🦦', '🦥', '🐁', '🐀', '🐿', '🦔', '🐾', '🐉', '🐲'],
+    food: ['🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶', '🌽', '🥕', '🥔', '🍠', '🥐', '🥯', '🍞', '🥖', '🥨', '🧀', '🥚', '🍳', '🥞', '🥓', '🥩', '🍗', '🍖', '🦴', '🌭', '🍔', '🍟', '🍕', '🥪', '🥙', '🌮', '🌯', '🥗', '🥘', '🥫', '🍝', '🍜', '🍲', '🍛', '🍣', '🍱', '🥟', '🦪', '🍤', '🍙', '🍚', '🍘', '🍥', '🥠', '🥮', '🍢', '🍡', '🍧', '🍨', '🍦', '🥧', '🍰', '🎂', '🍮', '🍭', '🍬', '🍫', '🍿', '🍩', '🍪', '🌰', '🥜', '🍯', '🥛', '🍼', '☕️', '🍵', '🥤', '🍶', '🍺', '🍻', '🥂', '🍷', '🥃', '🍸', '🍹', '🧃', '🧉', '🧊', '🥄', '🍴', '🍽', '🥣', '🥡', '🥢'],
+    travel: ['🚗', '🚕', '🚙', '🚌', '🚎', '🏎', '🚓', '🚑', '🚒', '🚐', '🛻', '🚚', '🚛', '🚜', '🏍', '🛵', '🚲', '🛴', '🛹', '🛼', '🚁', '🛸', '✈️', '🛫', '🛬', '🛩', '💺', '🚀', '🚂', '🚃', '🚄', '🚅', '🚆', '🚇', '🚈', '🚉', '🚊', '🚝', '🚞', '🚟', '🚠', '🚡', '⛱', '🎢', '🎡', '🎠', '🎪', '🎭', '🎨', '🎬', '🎤', '🎧', '🎼', '🎹', '🥁', '🎷', '🎺', '🎸', '🪕', '🎻', '🎲', '🎯', '🎳', '🎮', '🎰', '🧩', '🚗', '🚕', '🚙', '🚌', '🚎', '🏎', '🚓', '🚑', '🚒', '🚐', '🛻', '🚚', '🚛', '🚜', '🏍', '🛵', '🚲', '🛴', '🛹', '🛼', '🚁', '🛸', '✈️', '🛫', '🛬', '🛩', '💺', '🚀', '🚂', '🚃', '🚄', '🚅', '🚆', '🚇', '🚈', '🚉', '🚊', '🚝', '🚞', '🚟', '🚠', '🚡', '⛱', '🎢', '🎡', '🎠', '🎪', '🎭', '🎨', '🎬', '🎤', '🎧', '🎼', '🎹', '🥁', '🎷', '🎺', '🎸', '🪕', '🎻', '🎲', '🎯', '🎳', '🎮', '🎰', '🧩'],
+    objects: ['⌚️', '📱', '📲', '💻', '⌨️', '🖥', '🖨', '🖱', '🖲', '🕹', '🗜', '💾', '💿', '📀', '📼', '📷', '📸', '📹', '🎥', '📽', '🎞', '📞', '☎️', '📟', '📠', '📺', '📻', '🎙', '🎚', '🎛', '⏱', '⏲', '⏰', '🕰', '⌛️', '⏳', '📡', '🔋', '🔌', '💡', '🔦', '🕯', '🧯', '🛢', '💸', '💵', '💴', '💶', '💷', '💰', '💳', '💎', '⚖️', '🧰', '🔧', '🔨', '⚒', '🛠', '⛏', '🔩', '⚙️', '🧱', '⛓', '🧲', '🔫', '💣', '🧨', '🪓', '🔪', '🗡', '⚔️', '🛡', '🚬', '⚰️', '⚱️', '🏺', '🔮', '📿', '🧿', '💈', '⚗️', '🔭', '🔬', '🕳', '🩹', '🩺', '💊', '💉', '🩸', '🧬', '🦠', '🧫', '🧪', '🌡', '🧹', '🧺', '🧻', '🚽', '🚿', '🛁', '🛀', '🧼', '🪒', '🧽', '🧴', '🛎', '🔑', '🗝', '🚪', '🪑', '🛋', '🛏', '🛌', '🧸', '🪆', '🖼', '🪞', '🪟', '🛍', '🛒', '🎁', '🎈', '🎏', '🎀', '🪄', '🪅', '🪡', '🧵', '🪢', '👓', '🕶', '🥽', '🥼', '🦺', '👔', '👕', '👖', '🧣', '🧤', '🧥', '🧦', '👗', '👘', '🥻', '🩱', '🩲', '🩳', '👙', '👚', '👛', '👜', '👝', '🛍', '🎒', '👞', '👟', '🥾', '🥿', '👠', '👡', '🩰', '👢', '👑', '👒', '🎩', '🎓', '🧢', '⛑', '🪖', '💄', '💍', '💼']
+};
+
+// Initialize sticker picker
+let stickerPickerInitialized = false;
+function initStickerPicker() {
+    const stickerBtn = document.getElementById("sticker-btn");
+    const stickerPicker = document.getElementById("sticker-picker");
+    const closeSticker = document.getElementById("close-sticker");
+    const stickerGrid = document.getElementById("sticker-grid");
+    const categoryButtons = document.querySelectorAll(".sticker-category");
+    
+    console.log("Initializing sticker picker...", { stickerBtn, stickerPicker, stickerGrid });
+    
+    if (!stickerBtn || !stickerPicker) {
+        console.error("Sticker button or picker not found!");
+        return;
+    }
+    
+    // Prevent multiple initializations
+    if (stickerPickerInitialized) {
+        console.log("Sticker picker already initialized");
+        return;
+    }
+    stickerPickerInitialized = true;
+    
+    // Toggle sticker picker
+    stickerBtn.onclick = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log("Sticker button clicked!");
+        
+        // Close emoji picker if open
+        const emojiPicker = document.getElementById("emoji-picker");
+        if (emojiPicker && !emojiPicker.classList.contains("hidden")) {
+            emojiPicker.classList.add("hidden");
+        }
+        
+        const isHidden = stickerPicker.classList.contains("hidden");
+        console.log("Sticker picker is hidden:", isHidden);
+        
+        stickerPicker.classList.toggle("hidden");
+        
+        if (!stickerPicker.classList.contains("hidden")) {
+            console.log("Loading smileys category...");
+            loadStickerCategory("smileys");
+        }
+    };
+    
+    // Close sticker picker
+    if (closeSticker) {
+        closeSticker.addEventListener("click", () => {
+            stickerPicker.classList.add("hidden");
+        });
+    }
+    
+    // Category switching
+    categoryButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            categoryButtons.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            const category = btn.getAttribute("data-category");
+            loadStickerCategory(category);
+        });
+    });
+    
+    // Load sticker category
+    function loadStickerCategory(category) {
+        if (!stickerGrid) {
+            console.error("Sticker grid not found!");
+            return;
+        }
+        console.log("Loading sticker category:", category);
+        stickerGrid.innerHTML = "";
+        const stickers = stickerCategories[category] || [];
+        console.log("Found stickers:", stickers.length);
+        
+        if (stickers.length === 0) {
+            console.warn("No stickers found for category:", category);
+        }
+        
+        stickers.forEach(sticker => {
+            const stickerItem = document.createElement("div");
+            stickerItem.className = "sticker-item";
+            stickerItem.textContent = sticker;
+            stickerItem.title = sticker;
+            stickerItem.addEventListener("click", () => {
+                console.log("Sticker clicked:", sticker);
+                // Add sticker to input instead of sending immediately
+                insertStickerToInput(sticker);
+                stickerPicker.classList.add("hidden");
+            });
+            stickerGrid.appendChild(stickerItem);
+        });
+        
+        console.log("Stickers loaded:", stickerGrid.children.length);
+    }
+    
+    // Insert sticker to input field
+    function insertStickerToInput(sticker) {
+        const messageInput = document.getElementById("message");
+        if (messageInput) {
+            const cursorPos = messageInput.selectionStart;
+            const textBefore = messageInput.value.substring(0, cursorPos);
+            const textAfter = messageInput.value.substring(messageInput.selectionEnd);
+            messageInput.value = textBefore + sticker + textAfter;
+            messageInput.focus();
+            // Move cursor after the inserted sticker
+            const newPos = cursorPos + sticker.length;
+            messageInput.setSelectionRange(newPos, newPos);
+        }
+    }
+}
+
+// Initialize emoji picker
+let emojiPickerInitialized = false;
+function initEmojiPicker() {
+    const emojiBtn = document.getElementById("emoji-btn");
+    const emojiPicker = document.getElementById("emoji-picker");
+    const closeEmoji = document.getElementById("close-emoji");
+    const emojiGrid = document.getElementById("emoji-grid");
+    const categoryButtons = document.querySelectorAll(".emoji-category");
+    
+    if (!emojiBtn || !emojiPicker) return;
+    
+    // Prevent multiple initializations
+    if (emojiPickerInitialized) {
+        console.log("Emoji picker already initialized");
+        return;
+    }
+    emojiPickerInitialized = true;
+    
+    // Toggle emoji picker
+    emojiBtn.addEventListener("click", () => {
+        // Close sticker picker if open
+        const stickerPicker = document.getElementById("sticker-picker");
+        if (stickerPicker && !stickerPicker.classList.contains("hidden")) {
+            stickerPicker.classList.add("hidden");
+        }
+        
+        emojiPicker.classList.toggle("hidden");
+        if (!emojiPicker.classList.contains("hidden")) {
+            loadEmojiCategory("smileys");
+        }
+    });
+    
+    // Close emoji picker
+    if (closeEmoji) {
+        closeEmoji.addEventListener("click", () => {
+            emojiPicker.classList.add("hidden");
+        });
+    }
+    
+    // Category switching
+    categoryButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            categoryButtons.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            const category = btn.getAttribute("data-category");
+            loadEmojiCategory(category);
+        });
+    });
+    
+    // Load emoji category
+    function loadEmojiCategory(category) {
+        if (!emojiGrid) return;
+        emojiGrid.innerHTML = "";
+        const emojis = emojiCategories[category] || [];
+        emojis.forEach(emoji => {
+            const emojiItem = document.createElement("div");
+            emojiItem.className = "emoji-item";
+            emojiItem.textContent = emoji;
+            emojiItem.addEventListener("click", () => {
+                insertEmoji(emoji);
+            });
+            emojiGrid.appendChild(emojiItem);
+        });
+    }
+    
+    // Insert emoji into message input
+    function insertEmoji(emoji) {
+        const messageInput = document.getElementById("message");
+        if (messageInput) {
+            const cursorPos = messageInput.selectionStart;
+            const textBefore = messageInput.value.substring(0, cursorPos);
+            const textAfter = messageInput.value.substring(messageInput.selectionEnd);
+            messageInput.value = textBefore + emoji + textAfter;
+            messageInput.focus();
+            messageInput.setSelectionRange(cursorPos + emoji.length, cursorPos + emoji.length);
+        }
+    }
+}
+
+// File upload handler
+function initFileUpload() {
+    const fileBtn = document.getElementById("file-btn");
+    const fileInput = document.getElementById("file-input");
+    
+    if (!fileBtn || !fileInput) return;
+    
+    fileBtn.addEventListener("click", () => {
+        fileInput.click();
+    });
+    
+    fileInput.addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        // Check if it's an image
+        if (!file.type.startsWith("image/")) {
+            showError("Faqat rasm fayllari qabul qilinadi");
+            return;
+        }
+        
+        // Check file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            showError("Rasm hajmi 5MB dan kichik bo'lishi kerak");
+            return;
+        }
+        
+        // Convert to base64
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const base64Image = event.target.result;
+            // Send image as message
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: "message",
+                    message: "",
+                    image: base64Image
+                }));
+                fileInput.value = ""; // Reset input
+            }
+        };
+        reader.readAsDataURL(file);
+    });
 }
 
 // Event listeners
@@ -320,4 +680,9 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
         console.log("Login button not found");
     }
+    
+    // Initialize sticker picker, emoji picker and file upload
+    initStickerPicker();
+    initEmojiPicker();
+    initFileUpload();
 });

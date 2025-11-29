@@ -50,12 +50,19 @@ async def websocket_chat(websocket: WebSocket, token: str):
                 try:
                     if manager._shutdown:
                         break
-                    await websocket.send_json({
+                    history_data = {
                         "type": "message",
                         "username": msg.username,
-                        "message": msg.content,
                         "timestamp": msg.created_at.isoformat()
-                    })
+                    }
+                    if msg.content:
+                        history_data["message"] = msg.content
+                        # Check if it's a sticker (single emoji character)
+                        if len(msg.content) == 1 and ord(msg.content) > 0x1F000:
+                            history_data["isSticker"] = True
+                    if msg.image:
+                        history_data["image"] = msg.image
+                    await websocket.send_json(history_data)
                 except Exception:
                     break  # Stop if we can't send messages
 
@@ -86,19 +93,34 @@ async def websocket_chat(websocket: WebSocket, token: str):
 
                     # Handle regular messages
                     if message_data.get("type") == "message":
-                        # Get the actual message content
+                        # Get the actual message content, image, and sticker flag
                         message_content = message_data.get("message", "")
+                        message_image = message_data.get("image", "")
+                        is_sticker = message_data.get("isSticker", False)
                         
-                        # Validate message content
-                        if not message_content or not message_content.strip():
+                        # Validate: must have either message or image
+                        if (not message_content or not message_content.strip()) and not message_image:
                             continue  # Skip empty messages
                         
                         # Limit message length (e.g., 1000 characters)
-                        if len(message_content) > 1000:
+                        if message_content and len(message_content) > 1000:
                             message_content = message_content[:1000]
                         
+                        # Limit image size (base64 can be large, but we'll store it)
+                        # In production, you might want to save images to disk and store URLs
+                        if message_image and len(message_image) > 5 * 1024 * 1024:  # 5MB limit
+                            await websocket.send_json({
+                                "type": "error",
+                                "message": "Rasm hajmi juda katta"
+                            })
+                            continue
+                        
                         # Save message to database
-                        new_msg = Message(username=username, content=message_content)
+                        new_msg = Message(
+                            username=username,
+                            content=message_content if message_content else None,
+                            image=message_image if message_image else None
+                        )
                         db.add(new_msg)
                         await db.commit()
                         await db.refresh(new_msg)
@@ -107,12 +129,19 @@ async def websocket_chat(websocket: WebSocket, token: str):
                         await manager.user_typing(username, False)
 
                         # Broadcast to all users
-                        await manager.broadcast_json({
+                        broadcast_data = {
                             "type": "message",
                             "username": username,
-                            "message": message_content,
                             "timestamp": new_msg.created_at.isoformat()
-                        })
+                        }
+                        if message_content:
+                            broadcast_data["message"] = message_content
+                        if message_image:
+                            broadcast_data["image"] = message_image
+                        if is_sticker:
+                            broadcast_data["isSticker"] = True
+                        
+                        await manager.broadcast_json(broadcast_data)
                     
                 except WebSocketDisconnect:
                     break
