@@ -476,6 +476,24 @@ function initStickerPicker() {
             stickerPicker.classList.add("hidden");
         });
     }
+
+    // Close when clicking outside the picker
+    document.addEventListener('click', (e) => {
+        const target = e.target;
+        // If click is outside picker and not the sticker button, close picker
+        if (stickerPicker && !stickerPicker.contains(target) && target !== stickerBtn) {
+            if (!stickerPicker.classList.contains('hidden')) {
+                stickerPicker.classList.add('hidden');
+            }
+        }
+    });
+
+    // Close with Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && stickerPicker && !stickerPicker.classList.contains('hidden')) {
+            stickerPicker.classList.add('hidden');
+        }
+    });
     
     // Category switching
     categoryButtons.forEach(btn => {
@@ -509,8 +527,21 @@ function initStickerPicker() {
             stickerItem.title = sticker;
             stickerItem.addEventListener("click", () => {
                 console.log("Sticker clicked:", sticker);
-                // Add sticker to input instead of sending immediately
-                insertStickerToInput(sticker);
+                // If WebSocket is open, send sticker immediately
+                try {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: "message", message: sticker, isSticker: true }));
+                        // small visual feedback
+                        stickerItem.classList.add('sent');
+                        setTimeout(() => stickerItem.classList.remove('sent'), 250);
+                    } else {
+                        // Fallback: insert into input for manual send
+                        insertStickerToInput(sticker);
+                    }
+                } catch (err) {
+                    console.error('Failed to send sticker:', err);
+                    insertStickerToInput(sticker);
+                }
                 stickerPicker.classList.add("hidden");
             });
             stickerGrid.appendChild(stickerItem);

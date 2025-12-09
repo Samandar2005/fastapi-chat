@@ -472,6 +472,11 @@ p {
     transform: scale(0.95);
 }
 
+.sticker-item.sent {
+    transform: scale(0.95);
+    opacity: 0.6;
+}
+
 /* Emoji Picker Styles */
 .emoji-picker {
     position: absolute;
